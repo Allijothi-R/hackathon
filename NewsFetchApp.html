@@ -1,0 +1,252 @@
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="initial-scale=1, maximum-scale=1, user-scalable=no" />
+    <title>Fetch News Using ARCGIS Platform</title>
+    <style>
+        html,
+        body,
+        #viewDiv {
+            padding: 0;
+            margin: 0;
+            height: 100%;
+            width: 100%;
+        }
+
+        table,
+        td,
+        th {
+            border: 1px solid black;
+            font-size: 14px;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .btn-info {
+            position: absolute;
+            top: 10%;
+            right: 10%;
+            background-color: #0a4184;
+        }
+
+        #contentarea {
+            /*padding:10px;*/
+            padding: 0px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            position: relative;
+            width: 100%;
+            color: #000;
+            padding: 10px;
+            text-align: left;
+        }
+
+        #contentcontainer {
+            position: relative;
+            overflow-y: auto;
+            overflow-x: hidden;
+            max-height: calc(100% - 40px);
+            padding-right: 20px;
+        }
+
+        .widgetpanel {
+            position: absolute !important;
+            right: 93px;
+            /*width: 300px;*/
+            width: 400px;
+            background-color: #fff;
+            top: 50px;
+            /*max-height:80%;*/
+            max-height: 100%;
+            /*height: 250px;*/
+            height: auto !important;
+            min-height: 100px;
+            min-width: 260px;
+            z-index: 2;
+        }
+
+        #titlebox {
+            width: 100%;
+            height: 40px;
+            cursor: move;
+            background-color: #0a4184;
+            color: #fff;
+            line-height: 40px;
+        }
+
+        .title {
+            font-size: 14px;
+            text-transform: uppercase;
+            text-overflow: ellipsis;
+            margin-left: 5px;
+            text-shadow: 0px 2px 2px rgba(0, 0, 0, 0.89);
+        }
+
+        #widgetpanelicons {
+            float: right;
+        }
+
+        #infopanel {
+            display: none;
+        }
+
+
+        .widgetPanelclose {
+            float: right;
+            margin-right: 8px;
+            /*padding-top: 4px;*/
+            cursor: pointer;
+        }
+    </style>
+
+    <link rel="stylesheet" href="https://js.arcgis.com/4.22/esri/themes/light/main.css">
+
+    <!-- SCRIPTS -->
+    <script src="https://js.arcgis.com/4.22/"></script>
+    <script type="text/javascript" src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+    <script>
+        var state_name;
+        var flayer;
+        var view;
+        require([
+            "esri/config",
+            "esri/Map",
+            "esri/views/MapView",
+            "esri/layers/FeatureLayer",
+            "esri/Graphic"
+        ],
+            function (esriConfig,
+                Map,
+                MapView,
+                FeatureLayer,
+                Graphic) {
+                esriConfig.apiKey = "YOUR_ARCGIS_DEVELOPER_API_KEY";
+
+                const map = new Map({
+                    // basemap: "arcgis-imagery" // Basemap layer service
+                    basemap: "topo-vector" // Basemap layer service
+                });
+
+                view = new MapView({
+                    map: map,
+                    center: [78.6569, 22.9734], // Longitude, latitude
+                    zoom: 4, // Zoom level
+                    container: "viewDiv" // Div element
+                });
+
+                flayer = new FeatureLayer({
+                    url: "https://services6.arcgis.com/1sJA7ePPMkDGvX8V/arcgis/rest/services/stateindia_boundary/FeatureServer/1",
+                    outFields: ["*"],
+                    id: "India States Boundary",
+
+                });
+                map.add(flayer);
+
+                view.on("click", function (event) {
+                    mapclick_event = event;
+                    // the hitTest() checks to see if any graphics in the view
+                    // intersect the given screen x, y coordinates
+                    view.hitTest(event)
+                        .then(getGraphics);
+                });
+                document.getElementById("widgetpanelicons").onclick = (evt) => {
+                    $("#infopanel").css("display", "none");
+                }
+                function getGraphics(response) {
+                    var highlightSymbol = {
+                        type: "simple-fill", // autocasts as new SimpleFillSymbol()
+                        outline: {
+                            // autocasts as new SimpleLineSymbol()
+                            color: [128, 128, 128, 0.2],
+                            width: "0.5px"
+                        }
+                    };
+                    view.graphics.removeAll();
+                    var results = response.results;
+                    results.forEach(element => {
+                        var graphic = element.graphic;
+
+                        if (graphic.layer.id == "India States Boundary") {
+                            state_name = graphic.attributes.state;
+                            var highlightGraphic = new Graphic(graphic.geometry, highlightSymbol);
+                            view.graphics.add(highlightGraphic);
+                        }
+                    });
+
+
+
+                    var requestOptions = {
+                        method: 'GET',
+                        redirect: 'follow'
+                    };
+
+                    var newsAPIUrl = "NEWS_API_URL_OF_YOUR_CHOICE"
+                    fetch(newsAPIUrl, requestOptions)
+                        .then(response => response.text())
+                        .then(result => {
+                            console.log(result);
+
+                            var articles = JSON.parse(result).articles;
+                            if (articles.length > 0) {
+
+
+                                var table = "<table><thead><tr><td><b>Headlines</b></td><td><b>More Info</b></td></tr></thead>";
+
+                                for (var i = 0; i < articles.length; i++) {
+                                    if (i == 0) {
+                                        var tr = table + `<tr><td>${articles[i].title}</td>
+                                        <td><a style='color:blue' target='_blank' href=${articles[i].url}>URL</a></td></tr>`;
+                                    } else {
+                                        tr += `<tr><td>${articles[i].title}</td>
+                                        <td><a style='color:blue' target='_blank' href=${articles[i].url}>URL</a></td></tr>`
+                                    }
+                                }
+                                var content = tr + "</table>";
+                                document.getElementById("infoContainer").innerHTML = content;
+                                document.getElementById("TitleHeading").innerHTML = state_name + " Trending Headlines"
+                                $("#infopanel").css("display", "block");
+                            } else {
+                                document.getElementById("infoContainer").innerHTML = "No News to Report.";
+                                document.getElementById("TitleHeading").innerHTML = state_name + " Trending Headlines"
+                                $("#infopanel").css("display", "block");
+                            }
+
+                        })
+                        .catch(error => console.log('error', error));
+                }
+
+            });
+    </script>
+
+
+</head>
+
+<body>
+    <div id="viewDiv">
+        <div id="infoDiv">
+            <div id="infopanel" class="widgetpanel">
+                <div id="titlebox">
+                    <span class="title" id="TitleHeading"></span>
+                    <div id="widgetpanelicons">
+                        <span class="infoBtnclose widgetPanelclose" style="color: white;">
+                            x
+                        </span>
+                    </div>
+                </div>
+                <div id="contentcontainer">
+                    <div id="contentarea">
+                        <div id="infoContainer" style="position: relative; width:100%; height:100%;">
+
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
